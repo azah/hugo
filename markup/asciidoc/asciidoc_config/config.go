@@ -15,13 +15,53 @@
 package asciidoc_config
 
 // DefaultConfig holds the default asciidoc configuration.
-var Default = Config{
-	Args:                 []string{"--no-header-footer", "--safe", "--trace"},
-	WorkingFolderCurrent: false,
-}
+var (
+	Default = Config{
+		Backend:              "html5",
+		DocType:              "article",
+		Extensions:           []string{""},
+		NoHeaderOrFooter:     true,
+		SafeMode:             "safe",
+		SectionNumbers:       false,
+		Verbose:              false,
+		WorkingFolderCurrent: false,
+	}
+
+	ExtensionsWhitelist = []string{
+		"asciidoctor-html5s",
+		"asciidoctor-diagram",
+		"asciidoctor-interdoc-reftext",
+		"asciidoctor-katex",
+		"asciidoctor-latex",
+		"asciidoctor-question",
+		"asciidoctor-rouge",
+	}
+
+	SafeModeWhitelist = []string{
+		"unsafe", //default
+		"safe",
+		"server",
+		"secure",
+	}
+
+	BackendWhitelist = []string{
+		"html5",
+		"html5s",
+		"xhtml5",
+		"docbook5",
+		"docbook45",
+		"manpage",
+	}
+)
 
 // Config configures asciidoc.
 type Config struct {
-	Args                 []string
+	Backend              string
+	DocType              string
+	Extensions           []string
+	NoHeaderOrFooter     bool
+	SafeMode             string
+	SectionNumbers       bool
+	Verbose              bool
 	WorkingFolderCurrent bool
 }

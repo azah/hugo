@@ -20,9 +20,9 @@ import (
 	"path/filepath"
 
 	"github.com/gohugoio/hugo/identity"
-	"github.com/gohugoio/hugo/markup/internal"
-
+	"github.com/gohugoio/hugo/markup/asciidoc/asciidoc_config"
 	"github.com/gohugoio/hugo/markup/converter"
+	"github.com/gohugoio/hugo/markup/internal"
 )
 
 // Provider is the package entry point.
@@ -56,7 +56,6 @@ func (c *asciidocConverter) Supports(feature identity.Identity) bool {
 // getAsciidocContent calls asciidoctor or asciidoc as an external helper
 // to convert AsciiDoc content to HTML.
 func (a *asciidocConverter) getAsciidocContent(src []byte, ctx converter.DocumentContext) []byte {
-	var isAsciidoctor bool
 	path := getAsciidoctorExecPath()
 	if path == "" {
 		path = getAsciidocExecPath()
@@ -65,33 +64,51 @@ func (a *asciidocConverter) getAsciidocContent(src []byte, ctx converter.Documen
 				"                 Leaving AsciiDoc content unrendered.")
 			return src
 		}
-	} else {
-		isAsciidoctor = true
 	}
 
-	var args []string
-	if isAsciidoctor {
-		args = a.getAsciidoctorArgs(ctx)
-	} else {
-		args = []string{"--no-header-footer", "--safe"}
-	}
-	if len(args) > 0 && args[len(args)-1] != "-" {
-		args = append(args, "-")
-	}
+	args := a.parseArgs()
 
 	a.cfg.Logger.INFO.Println("Rendering", ctx.DocumentName, "with", path, "using asciidoc args", args, "...")
 
 	return internal.ExternallyRenderContent(a.cfg, ctx, src, path, args)
 }
 
-func (a *asciidocConverter) getAsciidoctorArgs(ctx converter.DocumentContext) []string {
-	args := make([]string, len(a.cfg.MarkupConfig.AsciidocExt.Args))
-	copy(args, a.cfg.MarkupConfig.AsciidocExt.Args)
+func (a *asciidocConverter) parseArgs() []string {
+	var cfg = a.cfg.MarkupConfig.AsciidocExt
+	args := []string{}
+
+	if contains(asciidoc_config.BackendWhitelist, cfg.Backend) {
+		args = append(args, "-b", cfg.Backend)
+	}
+
+	for _, extension := range cfg.Extensions {
+		if contains(asciidoc_config.ExtensionsWhitelist, extension) {
+			args = append(args, "-r", extension)
+			continue
+		}
+		a.cfg.Logger.ERROR.Println("Unsupported asciidoctor extension was passed in.")
+	}
+
+	if cfg.NoHeaderOrFooter == true {
+		args = append(args, "--no-header-footer")
+	}
+
+	if cfg.SectionNumbers == true {
+		args = append(args, "--section-numbers")
+	}
+
+	if cfg.Verbose == true {
+		args = append(args, "-v")
+	}
+
+	if contains(asciidoc_config.SafeModeWhitelist, cfg.SafeMode) {
+		args = append(args, "--safe-mode", cfg.SafeMode)
+	}
 
 	workingFolderCurrent := a.cfg.MarkupConfig.AsciidocExt.WorkingFolderCurrent
 
 	if workingFolderCurrent {
-		contentDir := filepath.Dir(ctx.Filename)
+		contentDir := filepath.Dir(a.ctx.Filename)
 		destinationDir := a.cfg.Cfg.GetString("destination")
 
 		a.cfg.Logger.INFO.Println("destinationDir", destinationDir)
@@ -99,12 +116,30 @@ func (a *asciidocConverter) getAsciidoctorArgs(ctx converter.DocumentContext) []
 			a.cfg.Logger.ERROR.Println("markup.asciidocext.workingFolderCurrent requires hugo command option --destination to be set")
 		}
 
-		outDir, err := filepath.Abs(filepath.Dir(filepath.Join(destinationDir, ctx.DocumentName)))
+		outDir, err := filepath.Abs(filepath.Dir(filepath.Join(destinationDir, a.ctx.DocumentName)))
 		if err != nil {
 			a.cfg.Logger.ERROR.Println("asciidoctor outDir", err)
 		}
 		args = append(args, "--base-dir", contentDir, "-a", "outdir="+outDir)
 	}
+
+	args = append(args, "-")
+
+	return args
+}
+
+func contains(s []string, elem interface{}) bool {
+	for _, a := range s {
+		if a == elem {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (a *asciidocConverter) getAsciidoctorArgs(ctx converter.DocumentContext) []string {
+	args := make([]string, 10)
 
 	return args
 }
